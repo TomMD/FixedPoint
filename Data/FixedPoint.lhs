@@ -48,7 +48,11 @@
 > import Debug.Trace
 > import Numeric
 
-This code implements n.n fixed point types allowing for a range from (2^(n-1),-2^(n-1)].
+This code implements n.m fixed point types allowing for a range from (2^(n-1),-2^(n-1)].
+Given a type `GenericFixedPoint flat internal fracBitRepr` the values m and n
+are:
+  m = bitSize fracBitRepr
+  n = bitSize flat - m
 
 The 'Flat' representation is a signed n+m bit value.  The 'Internal' representation should be a 2*(n+m)
 unsigned value for use in division.
