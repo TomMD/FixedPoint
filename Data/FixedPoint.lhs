@@ -1,4 +1,4 @@
-> {-# LANGUAGE BangPatterns #-}
+> {-# LANGUAGE BangPatterns, RankNTypes #-}
 > {- |This FixedPoint module implements arbitrary sized fixed point types and
 > computations.  This module intentionally avoids converting to 'Integer' for
 > computations because one purpose is to allow easy translation to other
@@ -33,7 +33,9 @@
 >       , Word128(..)
 >       , Word256
 >       , Word512
+>       , Word576
 >       , Word1024
+>       , Word1280
 >       , Word2048
 >       , Word4096
 >       , Word8192
@@ -255,7 +257,7 @@ classes, would be a beneficial task.
 >         go i  r
 >               | testBit b i  = go (i+1) (r + (a `shiftL` i))
 >               | otherwise    = go (i+1) r
->       negate a = a
+>       negate a = 0 - a
 >       abs a = a
 >       signum a = if a > 0 then 1 else 0
 >       fromInteger i = W128 (fromIntegral $ i `shiftR` 64) (fromIntegral i)
@@ -294,13 +296,13 @@ classes, would be a beneficial task.
 >       pred (W128 h 0) = W128 (pred h) maxBound
 >       pred (W128 h l) = W128 h (pred l)
 >       succ (W128 h l) = if l == maxBound then W128 (succ h) 0 else W128 h (succ l)
-> 
+>
 > instance Ord Word128 where
 >       compare (W128 ah al) (W128 bh bl) = compare (ah,al) (bh,bl)
 >
 > instance Real Word128 where
 >       toRational w = toRational (fromIntegral w :: Integer)
-> 
+>
 > instance Integral Word128 where
 >       toInteger (W128 h l) = (fromIntegral h `shiftL` bitSize l) + fromIntegral l
 >       divMod = quotRem
@@ -336,29 +338,37 @@ classes, would be a beneficial task.
 Larger word aliases follow.
 
 > -- |A 256 bit unsigned word
-> type Word256 = BigWord Word128
+> type Word256 = BigWord Word128 Word128
 >
 > -- |A 512 bit unsigned word
-> type Word512 = BigWord Word256
+> type Word512 = BigWord Word256 Word256
+
+> -- |A 576 bit unsigned word
+> type Word576 = BigWord Word512 Word64
 >
 > -- |A 1024 bit unsigned word
-> type Word1024 = BigWord Word512
+> type Word1024 = BigWord Word512 Word512
+>
+> -- |A 1280 bit unsigned word
+> type Word1280 = BigWord Word1024 Word256
 >
 > -- |A 2048 bit unsigned word
-> type Word2048 = BigWord Word1024
+> type Word2048 = BigWord Word1024 Word1024
 >
 > -- |A 4096 bit unsigned word
-> type Word4096 = BigWord Word2048
+> type Word4096 = BigWord Word2048 Word2048
 >
 > -- |A 8192 bit unsigned word
-> type Word8192 = BigWord Word4096
+> type Word8192 = BigWord Word4096 Word4096
 >
 > -- |A type constuctor allowing construction of @2^n@ bit unsigned words
 > -- The type variable represents half the underlying representation, so
 > -- @type Foo = BigWord Word13@ would have a bit size of @26 (2*13)@.
-> data BigWord a = BigWord a a
+> data BigWord a b = BigWord !a !b
 
-> instance (Bits a, Num a, Ord a) => Num (BigWord a) where
+> instance (Integral a, Bits a, Num a, Ord a, Bounded a
+>          ,Bits b, Num b, Ord b, Integral b, Bounded b)
+>          => Num (BigWord a b) where
 >       BigWord ah al + BigWord bh bl =
 >               let rl = al + bl
 >                   rh = ah + bh + if rl < al then 1 else 0
@@ -372,21 +382,27 @@ Larger word aliases follow.
 >         go i r
 >               | i == bitSize r = r
 >               | testBit b i    = go (i+1) (r + (a `shiftL` i))
->               | otherwise      = go (i+1)r
->       negate a = a
+>               | otherwise      = go (i+1) r
+>       negate a = 0 - a
 >       abs a = a
 >       signum a = if a > 0 then 1 else 0
 >       fromInteger i =
 >               let r@(BigWord _ b) = BigWord (fromIntegral $ i `shiftR` (bitSize b)) (fromIntegral i)
 >               in r
 >
+> pointwiseBW :: (Bits b, Bits c)
+>             => (forall a. Bits a => (a -> a)) -> BigWord b c -> BigWord b c
 > pointwiseBW op (BigWord a b) = BigWord (op a) (op b)
+> pointwiseBW2 :: (Bits b, Bits c)
+>              => (forall a. Bits a => (a -> a -> a))
+>              -> BigWord b c -> BigWord b c -> BigWord b c
 > pointwiseBW2 op (BigWord a b) (BigWord c d) = BigWord (op a c) (op b d)
 >
-> instance (Ord a) => Eq (BigWord a) where
+> instance (Ord a, Ord b) => Eq (BigWord a b) where
 >       a == b = EQ == compare a b
 >
-> instance (Ord a, Bits a) => Bits (BigWord a) where
+> instance (Ord a, Bits a, Integral a, Bounded a
+>          ,Ord b, Bits b, Integral b, Bounded b) => Bits (BigWord a b) where
 >       bit i | i >= bitSize b = r1
 >             | otherwise      = r2
 >        where r1@(BigWord _ b) = BigWord (bit $ i - bitSize b) 0
@@ -398,36 +414,46 @@ Larger word aliases follow.
 >       setBit (BigWord h l) i
 >               | i >= bitSize l = BigWord (setBit h (i-bitSize l)) l
 >               | otherwise      = BigWord h (setBit l i)
->       shiftL (BigWord h l) i
->               | i > bitSize l = shiftL (BigWord l 0) (i - bitSize l)
->               | otherwise     = BigWord ((h `shiftL` i) .|. (l `shiftR` (bitSize l - i))) (l `shiftL` i)
->       shiftR (BigWord h l) i 
->               | i > bitSize h = shiftR (BigWord 0 h) (i - bitSize h)
->               | otherwise     = BigWord (h `shiftR` i) ((l `shiftR` i) .|. h `shiftL` (bitSize h - i))
+>       shiftL b i = fromIntegral
+>                  . (`shiftL` i)
+>                  . (id :: Integer -> Integer)
+>                  . fromIntegral $ b
+>               -- | i > bitSize l = shiftL (BigWord (fromIntegral l) 0) (i - bitSize l)
+>               -- | otherwise     = BigWord ((h `shiftL` i) .|. (fromIntegral (l `shiftR` (bitSize l - i)))) (l `shiftL` i)
+>       shiftR b i = fromIntegral
+>                  . (`shiftR` i)
+>                  . (id :: Integer -> Integer)
+>                  . fromIntegral $ b
+>               -- | i > bitSize h = shiftR (BigWord 0 h) (i - bitSize h)
+>               -- | otherwise     = BigWord (h `shiftR` i) ((l `shiftR` i) .|. fromIntegral (h `shiftL` (bitSize h - i)))
 >       isSigned _ = False
 >       testBit (BigWord h l) i
 >               | i >= bitSize l = testBit h (i - bitSize l)
 >               | otherwise      = testBit l i
 >       bitSize ~(BigWord h l) = bitSize h + bitSize l
 >
-> instance (Bounded a,Eq a,Num a, Enum a) => Enum (BigWord a) where
+> instance (Bounded a, Eq a, Num a, Enum a, Bounded b, Eq b, Num b, Enum b)
+>          => Enum (BigWord a b) where
 >       toEnum i = BigWord 0 (toEnum i)
 >       fromEnum (BigWord _ l) = fromEnum l
 >       pred (BigWord h 0) = BigWord (pred h) maxBound
 >       pred (BigWord h l) = BigWord h (pred l)
 >       succ (BigWord h l) = if l == maxBound then BigWord (succ h) 0 else BigWord h (succ l)
 >
-> instance Bounded a => Bounded (BigWord a) where
+> instance (Bounded a, Bounded b) => Bounded (BigWord a b) where
 >       maxBound = BigWord maxBound maxBound
 >       minBound = BigWord minBound minBound
 >
-> instance Ord a => Ord (BigWord a) where
+> instance (Ord a, Ord b) => Ord (BigWord a b) where
 >       compare (BigWord a b) (BigWord c d) = compare (a,b) (c,d)
 >
-> instance (Bits a, Real a, Bounded a, Integral a) => Real (BigWord a) where
+> instance (Bits a, Real a, Bounded a, Integral a
+>          , Bits b, Real b, Bounded b, Integral b)
+>          => Real (BigWord a b) where
 >       toRational w = toRational (fromIntegral w :: Integer)
 >
-> instance (Bounded a, Integral a, Bits a) => Integral (BigWord a) where
+> instance (Bounded a, Integral a, Bits a
+>          ,Bounded b, Integral b, Bits b) => Integral (BigWord a b) where
 >       toInteger (BigWord h l) = (fromIntegral h `shiftL` bitSize l) + fromIntegral l
 >       divMod = quotRem
 >       quotRem a b =
@@ -435,7 +461,7 @@ Larger word aliases follow.
 >                   q = go 0 (bitSize a) 0
 >               in (q, r)
 >        where
->        -- go :: BigWord a -> Int -> BigWord a -> BigWord a
+>        -- go :: BigWord a b -> Int -> BigWord a b -> BigWord a b
 >        go t 0 v = if v >= b then t + 1 else t
 >        go t i v
 >               | v >= b    = go (setBit t i) i' v2
@@ -446,10 +472,13 @@ Larger word aliases follow.
 >         v1 = (v `shiftL` 1) .|. newBit
 >         v2 = ((v-b) `shiftL` 1) .|. newBit
 >
-> instance (Bounded a, Bits a, Integral a) => Show (BigWord a) where
+> instance (Bounded a, Bits a, Integral a, Bounded b, Bits b, Integral b)
+>          => Show (BigWord a b) where
 >       show = show . fromIntegral
 >
-> instance (Num a, Bits a, Ord a) => Read (BigWord a) where
+> instance (Integral a, Num a, Bits a, Ord a, Bounded a
+>          ,Integral b, Num b, Bits b, Ord b, Bounded b)
+>          => Read (BigWord a b) where
 >       readsPrec i s = let readsPrecI :: Int -> ReadS Integer
 >                           readsPrecI = readsPrec
 >                       in [(fromIntegral i, str) | (i,str) <- readsPrecI i s]
