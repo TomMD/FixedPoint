@@ -1,5 +1,5 @@
 Name:                FixedPoint-simple
-Version:             0.3
+Version:             0.3.1
 Synopsis:            Fixed point, large word, and large int numerical representations (types and common class instances)
 Description:         This library uses elementary techniques to implement fixed point types in terms
                      of basic integrals such as Word64.  All mathematical operations are implemented

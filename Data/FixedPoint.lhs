@@ -253,8 +253,8 @@ classes, would be a beneficial task.
 >               in W128 rh rl
 >       a * b = go 0 0
 >         where
->         go 64 r = r
->         go i  r
+>         go 128 r = r
+>         go i   r
 >               | testBit b i  = go (i+1) (r + (a `shiftL` i))
 >               | otherwise    = go (i+1) r
 >       negate a = 0 - a
