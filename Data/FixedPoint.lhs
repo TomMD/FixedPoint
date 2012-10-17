@@ -369,6 +369,14 @@ Larger word aliases follow.
 > instance (Integral a, Bits a, Num a, Ord a, Bounded a
 >          ,Bits b, Num b, Ord b, Integral b, Bounded b)
 >          => Num (BigWord a b) where
+>       {-# SPECIALIZE instance Num Word256 #-}
+>       {-# SPECIALIZE instance Num Word512 #-}
+>       {-# SPECIALIZE instance Num Word576 #-}
+>       {-# SPECIALIZE instance Num Word1024 #-}
+>       {-# SPECIALIZE instance Num Word1280 #-}
+>       {-# SPECIALIZE instance Num Word2048 #-}
+>       {-# SPECIALIZE instance Num Word4096 #-}
+>       {-# SPECIALIZE instance Num Word8192 #-}
 >       BigWord ah al + BigWord bh bl =
 >               let rl = al + bl
 >                   rh = ah + bh + if rl < al then 1 else 0
@@ -403,6 +411,14 @@ Larger word aliases follow.
 >
 > instance (Ord a, Bits a, Integral a, Bounded a
 >          ,Ord b, Bits b, Integral b, Bounded b) => Bits (BigWord a b) where
+>       {-# SPECIALIZE instance Bits Word256 #-}
+>       {-# SPECIALIZE instance Bits Word512 #-}
+>       {-# SPECIALIZE instance Bits Word576 #-}
+>       {-# SPECIALIZE instance Bits Word1024 #-}
+>       {-# SPECIALIZE instance Bits Word1280 #-}
+>       {-# SPECIALIZE instance Bits Word2048 #-}
+>       {-# SPECIALIZE instance Bits Word4096 #-}
+>       {-# SPECIALIZE instance Bits Word8192 #-}
 >       bit i | i >= bitSize b = r1
 >             | otherwise      = r2
 >        where r1@(BigWord _ b) = BigWord (bit $ i - bitSize b) 0
@@ -434,6 +450,14 @@ Larger word aliases follow.
 >
 > instance (Bounded a, Eq a, Num a, Enum a, Bounded b, Eq b, Num b, Enum b)
 >          => Enum (BigWord a b) where
+>       {-# SPECIALIZE instance Enum Word256 #-}
+>       {-# SPECIALIZE instance Enum Word512 #-}
+>       {-# SPECIALIZE instance Enum Word576 #-}
+>       {-# SPECIALIZE instance Enum Word1024 #-}
+>       {-# SPECIALIZE instance Enum Word1280 #-}
+>       {-# SPECIALIZE instance Enum Word2048 #-}
+>       {-# SPECIALIZE instance Enum Word4096 #-}
+>       {-# SPECIALIZE instance Enum Word8192 #-}
 >       toEnum i = BigWord 0 (toEnum i)
 >       fromEnum (BigWord _ l) = fromEnum l
 >       pred (BigWord h 0) = BigWord (pred h) maxBound
@@ -441,10 +465,26 @@ Larger word aliases follow.
 >       succ (BigWord h l) = if l == maxBound then BigWord (succ h) 0 else BigWord h (succ l)
 >
 > instance (Bounded a, Bounded b) => Bounded (BigWord a b) where
+>       {-# SPECIALIZE instance Bounded Word256 #-}
+>       {-# SPECIALIZE instance Bounded Word512 #-}
+>       {-# SPECIALIZE instance Bounded Word576 #-}
+>       {-# SPECIALIZE instance Bounded Word1024 #-}
+>       {-# SPECIALIZE instance Bounded Word1280 #-}
+>       {-# SPECIALIZE instance Bounded Word2048 #-}
+>       {-# SPECIALIZE instance Bounded Word4096 #-}
+>       {-# SPECIALIZE instance Bounded Word8192 #-}
 >       maxBound = BigWord maxBound maxBound
 >       minBound = BigWord minBound minBound
 >
 > instance (Ord a, Ord b) => Ord (BigWord a b) where
+>       {-# SPECIALIZE instance Ord Word256 #-}
+>       {-# SPECIALIZE instance Ord Word512 #-}
+>       {-# SPECIALIZE instance Ord Word576 #-}
+>       {-# SPECIALIZE instance Ord Word1024 #-}
+>       {-# SPECIALIZE instance Ord Word1280 #-}
+>       {-# SPECIALIZE instance Ord Word2048 #-}
+>       {-# SPECIALIZE instance Ord Word4096 #-}
+>       {-# SPECIALIZE instance Ord Word8192 #-}
 >       compare (BigWord a b) (BigWord c d) = compare (a,b) (c,d)
 >
 > instance (Bits a, Real a, Bounded a, Integral a
@@ -454,6 +494,14 @@ Larger word aliases follow.
 >
 > instance (Bounded a, Integral a, Bits a
 >          ,Bounded b, Integral b, Bits b) => Integral (BigWord a b) where
+>       {-# SPECIALIZE instance Integral Word256 #-}
+>       {-# SPECIALIZE instance Integral Word512 #-}
+>       {-# SPECIALIZE instance Integral Word576 #-}
+>       {-# SPECIALIZE instance Integral Word1024 #-}
+>       {-# SPECIALIZE instance Integral Word1280 #-}
+>       {-# SPECIALIZE instance Integral Word2048 #-}
+>       {-# SPECIALIZE instance Integral Word4096 #-}
+>       {-# SPECIALIZE instance Integral Word8192 #-}
 >       toInteger (BigWord h l) = (fromIntegral h `shiftL` bitSize l) + fromIntegral l
 >       divMod = quotRem
 >       quotRem a b =
