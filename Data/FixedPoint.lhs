@@ -47,7 +47,8 @@
 > import Data.Bits
 > import Data.Word
 > import Data.Int
-> import Debug.Trace
+> import Foreign.Storable
+> import Foreign.Ptr
 > import Numeric
 
 This code implements n.m fixed point types allowing for a range from (2^(n-1),-2^(n-1)].
@@ -631,3 +632,45 @@ For fixed point, the flat representation needs to be signed.
 > instance (Bounded a, Ord a, Bits a) => Bounded (BigInt a) where
 >       minBound = let r = fromIntegral (negate (2^ (bitSize r - 1))) in r
 >       maxBound = let r = fromIntegral (2^(bitSize r - 1) - 1) in r
+>
+> instance (Storable a) => Storable (BigInt a) where
+>       sizeOf ~(BigInt a) = sizeOf a
+>       alignment ~(BigInt a) = alignment a
+>       peekElemOff ptr i = fmap BigInt (peekElemOff (castPtr ptr) i)
+>       pokeElemOff ptr i (BigInt a) = pokeElemOff (castPtr ptr) i a
+>
+> instance (Storable a, Storable b) => Storable (BigWord a b) where
+>       sizeOf ~(BigWord a b) = sizeOf a + sizeOf b
+>       alignment ~(BigWord a b) = max (alignment a) (alignment b)
+>       peek ptr = do
+>               let p1 = castPtr ptr
+>               a <- peek p1
+>               let p2 = castPtr (plusPtr p1 (sizeOf a))
+>               b <- peek p2
+>               return (BigWord a b)
+>       poke ptr (BigWord a b) = do
+>               let p1 = castPtr ptr
+>               poke p1 a
+>               let p2 = castPtr (plusPtr p1 (sizeOf a))
+>               poke p2 b
+>
+> instance Storable Word128 where
+>       sizeOf ~(W128 a b) = sizeOf a + sizeOf b
+>       alignment ~(W128 a b) = max (alignment a) (alignment b)
+>       peek ptr = do
+>               let p1 = castPtr ptr
+>               a <- peek p1
+>               let p2 = castPtr $ plusPtr p1 (sizeOf a)
+>               b <- peek p2
+>               return (W128 a b)
+>       poke ptr (W128 a b) = do
+>               let p1 = castPtr ptr
+>               poke p1 a
+>               let p2 = castPtr $ plusPtr p1 (sizeOf a)
+>               poke p2 b
+>
+> instance Storable flat => Storable (GenericFixedPoint flat i r) where
+>       sizeOf ~(FixedPoint x) = sizeOf x
+>       alignment ~(FixedPoint x) = sizeOf x
+>       peek ptr = fmap FixedPoint $ peek (castPtr ptr)
+>       poke ptr (FixedPoint x) = poke (castPtr ptr) x
