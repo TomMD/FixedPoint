@@ -587,7 +587,7 @@ For fixed point, the flat representation needs to be signed.
 >       fromInteger i = if i < 0 then negate (BigInt $ fromInteger (abs i))
 >                                else BigInt (fromInteger i)
 >
-> instance (Bits a, Ord a) => Bits (BigInt a) where
+> instance (Bits a, Num a, Ord a) => Bits (BigInt a) where
 >       (.&.) a b = BigInt (unBI a .&. unBI b)
 >       (.|.) a b = BigInt (unBI a .|. unBI b)
 >       xor a b   = BigInt (unBI a `xor` unBI b)
@@ -629,7 +629,7 @@ For fixed point, the flat representation needs to be signed.
 >       toRational = fromIntegral
 >
 >
-> instance (Bounded a, Ord a, Bits a) => Bounded (BigInt a) where
+> instance (Bounded a, Ord a, Bits a, Num a) => Bounded (BigInt a) where
 >       minBound = let r = fromIntegral (negate (2^ (bitSize r - 1))) in r
 >       maxBound = let r = fromIntegral (2^(bitSize r - 1) - 1) in r
 >
