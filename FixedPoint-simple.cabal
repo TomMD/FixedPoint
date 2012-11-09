@@ -16,6 +16,8 @@ Build-type:          Simple
 -- Extra-source-files:  
 Cabal-version:       >=1.8
 
+Homepage:       https://github.com/TomMD/FixedPoint
+
 
 Library
   Exposed-modules:     Data.FixedPoint
