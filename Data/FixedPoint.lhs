@@ -612,7 +612,8 @@ For fixed point, the flat representation needs to be signed.
 >       succ a | a < maxBound = (a + 1)
 >
 > instance (Integral a, Bits a, Bounded a) => Integral (BigInt a) where
->       toInteger i@(BigInt h) = (if i < 0 then negate else id) (toInteger h)
+>       toInteger i@(BigInt h) =
+>               (if (i < 0) then negate else id) . toInteger . (if i < 0 then negate else id) $ h
 >       quotRem a b =
 >               let (BigInt ah) = abs a
 >                   (BigInt bh) = abs b
