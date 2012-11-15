@@ -1,5 +1,6 @@
 module Data.FixedPoint.TH 
     ( mkWord
+    , mkInt
     ) where
 
 import Language.Haskell.TH
@@ -14,7 +15,6 @@ mkWord i
   | i `rem` 8 /= 0 = error ("Can not build a word of bit size " ++ show i)
   | otherwise = do
         info <- lookupTypeName (mkS i)
-        reportError $ show (info,i)
         let b = isNothing info
         if b then do
                 let (h,l) = getParts i
@@ -28,7 +28,12 @@ mkWord i
   mkS = ("Word" ++) . show
 
 getParts i =
-    let l = (floor (logBase 2 (fromIntegral i))^2)
+    let l = 2^(floor (logBase 2 (fromIntegral i)))
         h = i - l
     in (h,l)
 
+mkInt :: Int -> DecsQ
+mkInt i = do
+    d <- mkWord i
+    e <- tySynD (mkName . ("Int" ++) . show $ i) [] (appT (conT $ mkName "BigInt") (conT . mkName . ("Word" ++) . show $ i))
+    return (e:d)
