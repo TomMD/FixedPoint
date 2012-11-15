@@ -31,18 +31,23 @@
 >       , Int8192
 >       -- * Big Word Types
 >       , Word128(..)
+>       , Word72
 >       , Word256
 >       , Word512
 >       , Word576
+>       , Word584
 >       , Word1024
 >       , Word1280
 >       , Word2048
+>       , Word2632
 >       , Word4096
 >       , Word8192
 >       -- * Type Constructors
 >       , GenericFixedPoint(..)
 >       , BigInt(..)
 >       , BigWord(..)
+>       -- * Helpers
+>       , fromInternal, toInternal, fracBits
 >       ) where
 > import Data.Bits
 > import Data.Word
@@ -50,6 +55,7 @@
 > import Foreign.Storable
 > import Foreign.Ptr
 > import Numeric
+> import Control.DeepSeq
 
 This code implements n.m fixed point types allowing for a range from (2^(n-1),-2^(n-1)].
 Given a type `GenericFixedPoint flat internal fracBitRepr` the values m and n
@@ -60,7 +66,7 @@ are:
 The 'Flat' representation is a signed n+m bit value.  The 'Internal' representation should be a 2*(n+m)
 unsigned value for use in division.
 
-> -- | GenericFixedPoitn is a type constructor for arbitrarily-sized fixed point
+> -- | GenericFixedPoint is a type constructor for arbitrarily-sized fixed point
 > -- tyes. Take note the first type variable, @flat@, should be a signed int
 > -- equal to the size of the fixed point integral plus fractional bits.
 > -- The second type variable, @internal@, should be unsigned and twice
@@ -69,10 +75,9 @@ unsigned value for use in division.
 > -- fractional bits in the fixed point type.  See the existing type aliases,
 > -- such as @FixedPoint4816@, for examples.
 
-> data GenericFixedPoint flat internal fracBitRepr = FixedPoint flat
+> data GenericFixedPoint flat internal fracBitRepr = FixedPoint { toFlat :: flat }
 >               deriving (Eq, Ord)
 >
-> toFlat (FixedPoint x) = x
 > fromFlat = FixedPoint
 >
 > type FixedPoint20482048 = GenericFixedPoint Int4096 Word8192 Word2048
@@ -87,9 +92,11 @@ unsigned value for use in division.
 > toInternal :: (Integral a, Num b) => GenericFixedPoint a b c -> b
 > toInternal (FixedPoint a) = fromIntegral a
 >
+> -- Convert a fixed point into its internal (high precision) representation for use in computations.
 > fromInternal :: (Integral b, Num a) =>  b -> GenericFixedPoint a b c
 > fromInternal w = FixedPoint (fromIntegral w)
 >
+> -- | Obtain the number of bits used to represent the fractional component of this fixed point.
 > fracBits :: (Bits c) => GenericFixedPoint a b c -> Int
 > fracBits = bitSize . getC
 >
@@ -177,17 +184,27 @@ of terms to allow testing / user control over cost and accuracy.
 >       let gNew = ((a`div`g) + g) `div` 2
 >       in if gNew == g then g else go (i-1) gNew
 
-The below exp function includes a taylor series (the 'go' function) but that
-operation alone looses precision too quickly so we restrict it's use to an
+The below exp function is a lookup table augmented with a taylor series.
+The taylor functuion looses precision too quickly so we restrict it's use to an
 acceptable range.  Outside of that range we depend on the property
-e^x = (e^(x/2))^2 to break the problem down.
+e^x = (e^(x/2))^2 to break the problem down (if the table hasn't already).
 
-This could probably be improved using a lookup table.
+> expTable :: [(Double,Double)]
+> expTable = let ys = [b*2**x | b <- [-1,1], x <- [8,7..(-10)]] in zip ys (map exp ys)
+>
+> exp' :: (Show a, Ord a, Fractional a, Eq a) => Int -> a -> a
+> exp' n a =
+>       let table = map (\(a,b) -> (realToFrac a, realToFrac b)) expTable
+>       in (\(r,x) -> r * expTaylor n x) $ foldl op (1,a) table
+>  where
+>  op (r,x) (p,ep)
+>     | signum p == signum x && abs p <= abs x = (r*ep, x - p)
+>     | otherwise = (r,x)
 
-> exp' :: (Ord a, Fractional a, Eq a) => Int -> a -> a
-> exp' 0 a = 1
-> exp' n a
->    | not (a > (-1) && a < 1) = let t = exp' n (a/2) in t*t
+> expTaylor :: (Ord a, Fractional a, Eq a) => Int -> a -> a
+> expTaylor 0 a = 1
+> expTaylor n a
+>    | not (a > (-1) && a < 1) = let t = expTaylor n (a/2) in t*t
 >    | otherwise               = go 1 1 a
 >  where
 >  go !i !total !term
@@ -199,7 +216,7 @@ accuracy too quickly due to the factorial term.  A superior version from
 picomath.org uses precomputed values (picomath released the code as public
 domain).
 
-> erf' :: (Eq a, Ord a, Num a, Fractional a) => Int -> a -> a
+> erf' :: (Show a, Eq a, Ord a, Num a, Fractional a) => Int -> a -> a
 > erf' n x =
 >       let a1 = 0.254829592
 >           a2 =  -0.284496736
@@ -210,7 +227,7 @@ domain).
 >           sign = if x < 0 then (-1) else 1
 >           x' = abs x
 >           t = 1 / (1 + p * x')
->           y = 1 -  (((((a5*t + a4)*t) + a3)*t + a2)*t + a1) * t * exp' n (-x'*x');
+>           y = 1 -  (((((a5*t + a4)*t) + a3)*t + a2)*t + a1) * t * exp' n (-x'*x')
 >       in sign * y
 >
 > flat1 :: (a -> Int -> a ) -> GenericFixedPoint a b c -> Int 
@@ -338,6 +355,9 @@ classes, would be a beneficial task.
 
 Larger word aliases follow.
 
+> -- |A 72 bit unsigned word
+> type Word72 = BigWord Word8 Word64
+>
 > -- |A 256 bit unsigned word
 > type Word256 = BigWord Word128 Word128
 >
@@ -347,6 +367,9 @@ Larger word aliases follow.
 > -- |A 576 bit unsigned word
 > type Word576 = BigWord Word512 Word64
 >
+> -- |A 584 bit unsigned word
+> type Word584 = BigWord Word72 Word512
+>
 > -- |A 1024 bit unsigned word
 > type Word1024 = BigWord Word512 Word512
 >
@@ -355,6 +378,9 @@ Larger word aliases follow.
 >
 > -- |A 2048 bit unsigned word
 > type Word2048 = BigWord Word1024 Word1024
+>
+> -- |A 2632 bit unsigned word
+> type Word2632 = BigWord Word584 Word2048
 >
 > -- |A 4096 bit unsigned word
 > type Word4096 = BigWord Word2048 Word2048
@@ -639,6 +665,18 @@ For fixed point, the flat representation needs to be signed.
 >       alignment ~(BigInt a) = alignment a
 >       peekElemOff ptr i = fmap BigInt (peekElemOff (castPtr ptr) i)
 >       pokeElemOff ptr i (BigInt a) = pokeElemOff (castPtr ptr) i a
+>
+> instance NFData a => NFData (BigInt a) where
+>    rnf (BigInt a) = rnf a
+>
+> instance (NFData a, NFData b) => NFData (BigWord a b) where
+>    rnf (BigWord a b) = rnf a `seq` rnf b
+>
+> instance NFData Word128 where
+>    rnf (W128 a b) = rnf a `seq` rnf b
+>
+> instance NFData flat => NFData (GenericFixedPoint flat i r) where
+>    rnf (FixedPoint f) = rnf f
 >
 > instance (Storable a, Storable b) => Storable (BigWord a b) where
 >       sizeOf ~(BigWord a b) = sizeOf a + sizeOf b
