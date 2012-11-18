@@ -176,11 +176,11 @@ of terms to allow testing / user control over cost and accuracy.
 > -- Suggested iterations: 500 (But it increases with the size of the input!)
 > sqrt' :: (Eq a, Integral a, Num a, Bits a, Integral b, Bits b, Bits c) =>
 >          Int -> GenericFixedPoint a  b c -> GenericFixedPoint a b c
-> sqrt' cnt input = fromFlat (go cnt 1) `shiftL` (fracBits input `div` 2)
+> sqrt' cnt input = fromFlat (go cnt (6`shiftL`fracBits input)) `shiftL` (fracBits input `div` 2)
 >  where
 >  a = toFlat input
 >  go 0 g = g
->  go i g = 
+>  go i g =
 >       let gNew = ((a`div`g) + g) `div` 2
 >       in if gNew == g then g else go (i-1) gNew
 
@@ -461,14 +461,10 @@ Larger word aliases follow.
 >                  . (`shiftL` i)
 >                  . (id :: Integer -> Integer)
 >                  . fromIntegral $ b
->               -- | i > bitSize l = shiftL (BigWord (fromIntegral l) 0) (i - bitSize l)
->               -- | otherwise     = BigWord ((h `shiftL` i) .|. (fromIntegral (l `shiftR` (bitSize l - i)))) (l `shiftL` i)
 >       shiftR b i = fromIntegral
 >                  . (`shiftR` i)
 >                  . (id :: Integer -> Integer)
 >                  . fromIntegral $ b
->               -- | i > bitSize h = shiftR (BigWord 0 h) (i - bitSize h)
->               -- | otherwise     = BigWord (h `shiftR` i) ((l `shiftR` i) .|. fromIntegral (h `shiftL` (bitSize h - i)))
 >       isSigned _ = False
 >       testBit (BigWord h l) i
 >               | i >= bitSize l = testBit h (i - bitSize l)

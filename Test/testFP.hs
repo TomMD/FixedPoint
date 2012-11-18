@@ -7,7 +7,7 @@ import Data.Number.Erf
 import Control.Applicative
 
 -- type FixedPoint = FixedPoint128128
-type FixedPoint = FixedPoint128128
+type FixedPoint = FixedPoint6464
 
 instance Arbitrary FixedPoint6464 where
         arbitrary = fmap FixedPoint arbitrary
