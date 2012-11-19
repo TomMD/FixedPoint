@@ -171,18 +171,25 @@ of terms to allow testing / user control over cost and accuracy.
 >         GenericFixedPoint a b c
 > pi' = realToFrac pi
 
-> -- | The square root operation uses Newton's method but is parameterized by the number
-> -- of iterations and stops early if we have arrived at a fixed point (no pun intended).
-> -- Suggested iterations: 500 (But it increases with the size of the input!)
-> sqrt' :: (Eq a, Integral a, Num a, Bits a, Integral b, Bits b, Bits c) =>
->          Int -> GenericFixedPoint a  b c -> GenericFixedPoint a b c
-> sqrt' cnt input = fromFlat (go cnt 1) `shiftL` (fracBits input `div` 2)
+
+> -- | The square root operation converges in O(bitSize input).
+> sqrt' :: (Ord b, Integral b, Bits b, Integral a, Num a, Bits a, Bits c) =>
+>          GenericFixedPoint a b c -> GenericFixedPoint a b c
+> sqrt' x = fromInternal . fpSqrtRaw .  toInternal $ x
 >  where
->  a = toFlat input
->  go 0 g = g
->  go i g = 
->       let gNew = ((a`div`g) + g) `div` 2
->       in if gNew == g then g else go (i-1) gNew
+> -- Note: Using 'internal' instead of an unsigned version of 'flat'
+> -- is unnecessary but preferable to adding yet another type variable or a type function.
+>  fpSqrtRaw n0 | n0 < 0  = error "fpSqrt of a negative number"
+>  fpSqrtRaw n0 = case iterate (step (bitSize n0)) (0,0,1,n0) !! bitSize n0 of
+>                  (_,a,_,_) -> a `shiftR` ((bitSize n0 - fracBits x) `div` 2)
+>  step sz (!s,!a,!t,!n) =
+>    let s0 = (s `shiftL` 2) .|. (n `shiftR` (sz - 2))
+>        n1 = n `shiftL` 2
+>        a0 = a `shiftL` 1
+>        (a1,s1,t0) = if s0 < t then (a0,       s0    , t - 1)
+>                               else (a0 .|. 1, s0 - t, t + 1)
+>        t1 = (t0 `shiftL` 1) .|. 1
+>    in (s1,a1,t1,n1)
 
 The below exp function is a lookup table augmented with a taylor series.
 The taylor functuion looses precision too quickly so we restrict it's use to an
