@@ -314,7 +314,7 @@ classes, would be a beneficial task.
 >               | i >= bitSize l = testBit h (i - bitSize l)
 >               | otherwise      = testBit l i
 >       bitSize _ = 128
-> 
+>
 > instance Enum Word128 where
 >       toEnum i            = W128 0 (toEnum i)
 >       fromEnum (W128 _ l) = fromEnum l
@@ -468,14 +468,10 @@ Larger word aliases follow.
 >                  . (`shiftL` i)
 >                  . (id :: Integer -> Integer)
 >                  . fromIntegral $ b
->               -- | i > bitSize l = shiftL (BigWord (fromIntegral l) 0) (i - bitSize l)
->               -- | otherwise     = BigWord ((h `shiftL` i) .|. (fromIntegral (l `shiftR` (bitSize l - i)))) (l `shiftL` i)
 >       shiftR b i = fromIntegral
 >                  . (`shiftR` i)
 >                  . (id :: Integer -> Integer)
 >                  . fromIntegral $ b
->               -- | i > bitSize h = shiftR (BigWord 0 h) (i - bitSize h)
->               -- | otherwise     = BigWord (h `shiftR` i) ((l `shiftR` i) .|. fromIntegral (h `shiftL` (bitSize h - i)))
 >       isSigned _ = False
 >       testBit (BigWord h l) i
 >               | i >= bitSize l = testBit h (i - bitSize l)
