@@ -246,6 +246,9 @@ domain).
 >
 > instance (Ord a, Bits a, Bits b, Integral a, Integral b, Bits c) =>
 >          Bits (GenericFixedPoint a b c) where
+>       testBit a = testBit (toFlat a)
+>       bit i = FixedPoint (bit i)
+>       popCount = popCount . toFlat
 >       setBit = flat1 setBit
 >       (.|.) = flat2 (.|.)
 >       xor = flat2 xor
@@ -294,6 +297,7 @@ classes, would be a beneficial task.
 >       a == b = EQ == compare a b
 >
 > instance Bits Word128 where
+>       popCount (W128 h l) = popCount h + popCount l
 >       bit i | i >= 64    = W128 (bit $ i - 64) 0
 >             | otherwise = W128 0 (bit i)
 >       complement = pointwise complement
@@ -453,6 +457,7 @@ Larger word aliases follow.
 >       {-# SPECIALIZE instance Bits Word2048 #-}
 >       {-# SPECIALIZE instance Bits Word4096 #-}
 >       {-# SPECIALIZE instance Bits Word8192 #-}
+>       popCount (BigWord a b) = popCount a + popCount b
 >       bit i | i >= bitSize b = r1
 >             | otherwise      = r2
 >        where r1@(BigWord _ b) = BigWord (bit $ i - bitSize b) 0
@@ -617,6 +622,7 @@ For fixed point, the flat representation needs to be signed.
 >                                else BigInt (fromInteger i)
 >
 > instance (Bits a, Num a, Ord a) => Bits (BigInt a) where
+>       popCount (BigInt a) = popCount a
 >       (.&.) a b = BigInt (unBI a .&. unBI b)
 >       (.|.) a b = BigInt (unBI a .|. unBI b)
 >       xor a b   = BigInt (unBI a `xor` unBI b)
