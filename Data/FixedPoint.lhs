@@ -376,7 +376,7 @@ Larger word aliases follow.
 > type Word512 = BigWord Word256 Word256
 
 > -- |A 576 bit unsigned word
-> type Word576 = BigWord Word512 Word64
+> type Word576 = BigWord Word64 Word512
 >
 > -- |A 584 bit unsigned word
 > type Word584 = BigWord Word72 Word512
