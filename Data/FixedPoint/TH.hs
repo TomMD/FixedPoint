@@ -42,9 +42,13 @@ getParts i =
 -- See the requirements under 'mkWord' for additional information.
 mkInt :: Int -> DecsQ
 mkInt i = do
-    d <- mkWord i
-    e <- tySynD (mkName . ("Int" ++) . show $ i) [] (appT (conT $ mkName "BigInt") (conT $ mkW i))
-    return (e:d)
+    info <- lookupTypeName (mkS i)
+    if isNothing info
+      then do
+        d <- mkWord i
+        e <- tySynD (mkName . ("Int" ++) . show $ i) [] (appT (conT $ mkName "BigInt") (conT $ mkW i))
+        return (e:d)
+      else return []
 
 -- @mkFixedPoint X Y@ Builds a fixed point alias named @FixedPointX_Y@. See
 -- the requirements under 'mkWord' for additional information.
