@@ -19,10 +19,15 @@ mkWord i
         let b = isNothing info
         if b then do
                 let (h,l) = getParts i
-                hD <- mkWord h
-                lD <- mkWord l
-                a <- tySynD (mkW i) [] (appT (appT (conT $ mkName "BigWord") (conT $ mkW h)) (conT $ mkW l))
-                return $ a:(hD++lD)
+                if h == 0
+                    then do let l' = l`div`2
+                            lD <- mkWord l'
+                            a <- tySynD (mkW i) [] (appT (appT (conT $ mkName "BigWord") (conT $ mkW l')) (conT $ mkW l'))
+                            return $ a:lD
+                    else do hD <- mkWord h
+                            lD <- mkWord l
+                            a <- tySynD (mkW i) [] (appT (appT (conT $ mkName "BigWord") (conT $ mkW h)) (conT $ mkW l))
+                            return $ a:(hD++lD)
              else return []
 
 mkS :: Int -> String
