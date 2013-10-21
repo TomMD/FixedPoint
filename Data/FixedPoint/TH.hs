@@ -55,8 +55,9 @@ mkInt i = do
         return (e:d)
       else return []
 
--- @mkFixedPoint X Y@ Builds a fixed point alias named @FixedPointX_Y@. See
--- the requirements under 'mkWord' for additional information.
+-- @mkFixedPoint X Y@ Builds a fixed point alias named @FixedPointX_Y@
+-- where X is the integral size in bits and Y is the fractional size in
+-- bits. See the requirements under 'mkWord' for additional information.
 mkFixedPoint :: Int -> Int -> DecsQ
 mkFixedPoint int frac
   | (int + frac) `rem` 8 /= 0 = error "For fixed points, The sum of the integral and fractional bits must be a multiple of 8."

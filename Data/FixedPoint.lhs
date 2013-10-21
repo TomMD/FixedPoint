@@ -161,6 +161,13 @@ unsigned value for use in division.
 >       Read (GenericFixedPoint a b c) where
 >       readsPrec n s = [ (realToFrac (r::Double), s) | (r,s) <- readsPrec n s]
 
+> instance (Bits b, Bits c, Bits a, Integral a, Integral b) =>
+>        RealFrac (GenericFixedPoint a b c) where
+>   properFraction f@(FixedPoint a) =
+>      let nr = fracBits f
+>          m  = 2^nr - 1
+>      in (fromIntegral $ a `shiftR` nr, FixedPoint $ a .&. m)
+
 Now we need some advanced functions (beyond +,-,*,/) on our fixed point type.
 Specifically, we want 'exp' (exponentiation with a base of 'e' ~ 2.71), erf (the
 "error function"), and square root.  All of these will be implemented by some
@@ -197,7 +204,7 @@ acceptable range.  Outside of that range we depend on the property
 e^x = (e^(x/2))^2 to break the problem down (if the table hasn't already).
 
 > expTable :: [(Double,Double)]
-> expTable = let ys = [b*2**x | b <- [-1,1], x <- [8,7..(-10)]] in zip ys (map exp ys)
+> expTable = let ys = [b*2**x | b <- [-1,1], x <- [64,63..(-10)]] in zip ys (map exp ys)
 >
 > exp' :: (Show a, Ord a, Fractional a, Eq a) => Int -> a -> a
 > exp' n a =
