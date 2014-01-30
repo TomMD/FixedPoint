@@ -1,4 +1,6 @@
-> {-# LANGUAGE BangPatterns, RankNTypes #-}
+> {-# LANGUAGE BangPatterns #-}
+> {-# LANGUAGE RankNTypes #-}
+> {-# LANGUAGE CPP #-}
 > {- |This FixedPoint module implements arbitrary sized fixed point types and
 > computations.  This module intentionally avoids converting to 'Integer' for
 > computations because one purpose is to allow easy translation to other
@@ -60,8 +62,8 @@
 This code implements n.m fixed point types allowing for a range from (2^(n-1),-2^(n-1)].
 Given a type `GenericFixedPoint flat internal fracBitRepr` the values m and n
 are:
-  m = bitSize fracBitRepr
-  n = bitSize flat - m
+  m = finiteBitSize fracBitRepr
+  n = finiteBitSize flat - m
 
 The 'Flat' representation is a signed n+m bit value.  The 'Internal' representation should be a 2*(n+m)
 unsigned value for use in division.
@@ -97,17 +99,17 @@ unsigned value for use in division.
 > fromInternal w = FixedPoint (fromIntegral w)
 >
 > -- | Obtain the number of bits used to represent the fractional component of this fixed point.
-> fracBits :: (Bits c) => GenericFixedPoint a b c -> Int
-> fracBits = bitSize . getC
+> fracBits :: (FiniteBits c) => GenericFixedPoint a b c -> Int
+> fracBits = finiteBitSize . getC
 >
 > getC :: GenericFixedPoint a b c -> c
 > getC = const undefined
 >
-> instance (Integral a, Integral b, Bits a, Bits b, Bits c) =>
+> instance (Integral a, Integral b, Bits a, Bits b, Bits c, FiniteBits c) =>
 >          Show (GenericFixedPoint a b c) where
 >     show =  (show :: Double -> String) . realToFrac
 >
-> instance (Enum a, Num a, Bits a, Bits c) =>
+> instance (Enum a, Num a, Bits a, Bits c, FiniteBits c) =>
 >          Enum (GenericFixedPoint a b c) where
 >     succ (FixedPoint a) = FixedPoint (a + 1)
 >     pred (FixedPoint a) = FixedPoint (a - 1)
@@ -118,7 +120,7 @@ unsigned value for use in division.
 >
 
 
-> instance (Ord a, Num a, Bits a, Bits b, Integral a, Integral b, Bits c) =>
+> instance (Ord a, Num a, Bits a, Bits b, Integral a, Integral b, Bits c, FiniteBits c) =>
 >          Num (GenericFixedPoint a b c) where
 >
 >     {-# SPECIALIZE INLINE (+) :: FixedPoint6464 -> FixedPoint6464 -> FixedPoint6464 #-}
@@ -135,7 +137,7 @@ unsigned value for use in division.
 >     abs (FixedPoint a) = FixedPoint (abs a)
 >     fromInteger i = let r = FixedPoint (fromInteger i `shiftL` fracBits r) in r
 >
-> instance (Ord a, Integral a, Bits a, Num a, Bits b, Integral b, Bits c) =>
+> instance (Ord a, Integral a, Bits a, Num a, Bits b, Integral b, Bits c, FiniteBits c) =>
 >    Fractional (GenericFixedPoint a b c) where
 >     aval / bval =
 >       let wa = toInternal $ abs aval
@@ -151,17 +153,17 @@ unsigned value for use in division.
 >           res = FixedPoint ((abs r `shiftL` fracBits res) .|. rf)
 >       in signFix res
 >
-> instance (Integral a, Ord a, Num a, Bits a, Bits b, Integral b, Bits c) =>
+> instance (Integral a, Ord a, Num a, Bits a, Bits b, Integral b, Bits c, FiniteBits c) =>
 >          Real (GenericFixedPoint a b c) where
 >       toRational f@(FixedPoint a) 
 >               | a < 0     = negate (toRational $ negate f)
 >               | otherwise = fromIntegral a / (2^(fracBits f))
 >
-> instance (Integral a, Bits a, Integral b, Num a, Bits b, Bits c) => 
+> instance (Integral a, Bits a, Integral b, Num a, Bits b, Bits c, FiniteBits c) => 
 >       Read (GenericFixedPoint a b c) where
 >       readsPrec n s = [ (realToFrac (r::Double), s) | (r,s) <- readsPrec n s]
 
-> instance (Bits b, Bits c, Bits a, Integral a, Integral b) =>
+> instance (Bits b, Bits c, Bits a, Integral a, Integral b, FiniteBits c) =>
 >        RealFrac (GenericFixedPoint a b c) where
 >   properFraction f@(FixedPoint a) =
 >      let nr = fracBits f
@@ -174,21 +176,21 @@ Specifically, we want 'exp' (exponentiation with a base of 'e' ~ 2.71), erf (the
 form of approximation such as a Taylor series.  We thus parameterize the number
 of terms to allow testing / user control over cost and accuracy.
 
-> pi' :: (Integral a, Bits a, Integral b, Num a, Bits b, Bits c) => 
+> pi' :: (Integral a, Bits a, Integral b, Num a, Bits b, Bits c, FiniteBits c) => 
 >         GenericFixedPoint a b c
 > pi' = realToFrac pi
 
 
 > -- | The square root operation converges in O(bitSize input).
-> sqrt' :: (Ord b, Integral b, Bits b, Integral a, Num a, Bits a, Bits c) =>
+> sqrt' :: (Ord b, Integral b, Bits b, Integral a, Num a, Bits a, Bits c, FiniteBits b, FiniteBits c) =>
 >          GenericFixedPoint a b c -> GenericFixedPoint a b c
 > sqrt' x = fromInternal . fpSqrtRaw .  toInternal $ x
 >  where
 > -- Note: Using 'internal' instead of an unsigned version of 'flat'
 > -- is unnecessary but preferable to adding yet another type variable or a type function.
 >  fpSqrtRaw n0 | n0 < 0  = error "fpSqrt of a negative number"
->  fpSqrtRaw n0 = case iterate (step (bitSize n0)) (0,0,1,n0) !! bitSize n0 of
->                  (_,a,_,_) -> a `shiftR` ((bitSize n0 - fracBits x) `div` 2)
+>  fpSqrtRaw n0 = case iterate (step (finiteBitSize n0)) (0,0,1,n0) !! finiteBitSize n0 of
+>                  (_,a,_,_) -> a `shiftR` ((finiteBitSize n0 - fracBits x) `div` 2)
 >  step sz (!s,!a,!t,!n) =
 >    let s0 = (s `shiftL` 2) .|. (n `shiftR` (sz - 2))
 >        n1 = n `shiftL` 2
@@ -251,8 +253,9 @@ domain).
 >       -> GenericFixedPoint a b c -> GenericFixedPoint a b c
 > flat2 op a b = fromFlat (op (toFlat a) (toFlat b))
 >
-> instance (Ord a, Bits a, Bits b, Integral a, Integral b, Bits c) =>
+> instance (Ord a, Bits a, Bits b, Integral a, Integral b, Bits c, FiniteBits c) =>
 >          Bits (GenericFixedPoint a b c) where
+>       rotate a i = fromFlat (rotate (toFlat a) i)
 >       testBit a = testBit (toFlat a)
 >       bit i = FixedPoint (bit i)
 >       popCount = popCount . toFlat
@@ -303,6 +306,9 @@ classes, would be a beneficial task.
 > instance Eq Word128 where
 >       a == b = EQ == compare a b
 >
+> instance FiniteBits Word128 where
+>       finiteBitSize ~(W128 a b) = finiteBitSize a + finiteBitSize b
+>
 > instance Bits Word128 where
 >       popCount (W128 h l) = popCount h + popCount l
 >       bit i | i >= 64    = W128 (bit $ i - 64) 0
@@ -315,14 +321,14 @@ classes, would be a beneficial task.
 >               | i >= 64   = W128 (setBit h (i - 64)) l
 >               | otherwise = W128 h (setBit l i)
 >       shiftL (W128 h l) i
->               | i > bitSize l = shiftL (W128 l 0) (i - bitSize l)
->               | otherwise     = W128 ((h `shiftL` i) .|. (l `shiftR` (bitSize l - i))) (l `shiftL` i)
+>               | i > finiteBitSize l = shiftL (W128 l 0) (i - finiteBitSize l)
+>               | otherwise     = W128 ((h `shiftL` i) .|. (l `shiftR` (finiteBitSize l - i))) (l `shiftL` i)
 >       shiftR (W128 h l) i 
->               | i > bitSize h = shiftR (W128 0 h) (i - bitSize h)
->               | otherwise     = W128 (h `shiftR` i) ((l `shiftR` i) .|. h `shiftL` (bitSize h - i))
+>               | i > finiteBitSize h = shiftR (W128 0 h) (i - finiteBitSize h)
+>               | otherwise     = W128 (h `shiftR` i) ((l `shiftR` i) .|. h `shiftL` (finiteBitSize h - i))
 >       isSigned _ = False
 >       testBit (W128 h l) i
->               | i >= bitSize l = testBit h (i - bitSize l)
+>               | i >= finiteBitSize l = testBit h (i - finiteBitSize l)
 >               | otherwise      = testBit l i
 >       bitSize _ = 128
 >
@@ -340,11 +346,11 @@ classes, would be a beneficial task.
 >       toRational w = toRational (fromIntegral w :: Integer)
 >
 > instance Integral Word128 where
->       toInteger (W128 h l) = (fromIntegral h `shiftL` bitSize l) + fromIntegral l
+>       toInteger (W128 h l) = (fromIntegral h `shiftL` finiteBitSize l) + fromIntegral l
 >       divMod = quotRem
 >       quotRem a@(W128 ah al) b@(W128 bh bl) =
 >               let r = a - q*b
->                   q = go 0 (bitSize a) 0
+>                   q = go 0 (finiteBitSize a) 0
 >               in (q,r)
 >        where
 >        -- Trivial long division
@@ -412,7 +418,8 @@ Larger word aliases follow.
 > data BigWord a b = BigWord !a !b
 
 > instance (Integral a, Bits a, Num a, Ord a, Bounded a
->          ,Bits b, Num b, Ord b, Integral b, Bounded b)
+>          ,Bits b, Num b, Ord b, Integral b, Bounded b
+>          , FiniteBits a, FiniteBits b)
 >          => Num (BigWord a b) where
 >       {-# SPECIALIZE instance Num Word256 #-}
 >       {-# SPECIALIZE instance Num Word512 #-}
@@ -433,15 +440,20 @@ Larger word aliases follow.
 >       a * b = go 0 0
 >         where
 >         go i r
->               | i == bitSize r = r
+>               | i == finiteBitSize r = r
 >               | testBit b i    = go (i+1) (r + (a `shiftL` i))
 >               | otherwise      = go (i+1) r
 >       negate a = 0 - a
 >       abs a = a
 >       signum a = if a > 0 then 1 else 0
 >       fromInteger i =
->               let r@(BigWord _ b) = BigWord (fromIntegral $ i `shiftR` (bitSize b)) (fromIntegral i)
+>               let r@(BigWord _ b) = BigWord (fromIntegral $ i `shiftR` (finiteBitSize b)) (fromIntegral i)
 >               in r
+>
+#if (__GLASGOW_HASKELL__ >= 708)
+> instance (Bounded a, Bounded b, FiniteBits a, FiniteBits b, Ord b, Ord a, Integral b, Integral a) => FiniteBits (BigWord a b) where
+>       finiteBitSize ~(BigWord a b) = finiteBitSize a + finiteBitSize b
+#endif
 >
 > pointwiseBW :: (Bits b, Bits c)
 >             => (forall a. Bits a => (a -> a)) -> BigWord b c -> BigWord b c
@@ -455,7 +467,8 @@ Larger word aliases follow.
 >       a == b = EQ == compare a b
 >
 > instance (Ord a, Bits a, Integral a, Bounded a
->          ,Ord b, Bits b, Integral b, Bounded b) => Bits (BigWord a b) where
+>          ,Ord b, Bits b, Integral b, Bounded b
+>          ,FiniteBits b, FiniteBits a) => Bits (BigWord a b) where
 >       {-# SPECIALIZE instance Bits Word256 #-}
 >       {-# SPECIALIZE instance Bits Word512 #-}
 >       {-# SPECIALIZE instance Bits Word576 #-}
@@ -465,16 +478,16 @@ Larger word aliases follow.
 >       {-# SPECIALIZE instance Bits Word4096 #-}
 >       {-# SPECIALIZE instance Bits Word8192 #-}
 >       popCount (BigWord a b) = popCount a + popCount b
->       bit i | i >= bitSize b = r1
+>       bit i | i >= finiteBitSize b = r1
 >             | otherwise      = r2
->        where r1@(BigWord _ b) = BigWord (bit $ i - bitSize b) 0
+>        where r1@(BigWord _ b) = BigWord (bit $ i - finiteBitSize b) 0
 >              r2 = BigWord 0 (bit i)
 >       complement = pointwiseBW complement
 >       (.&.) = pointwiseBW2 (.&.)
 >       (.|.) = pointwiseBW2 (.|.)
 >       xor   = pointwiseBW2 xor
 >       setBit (BigWord h l) i
->               | i >= bitSize l = BigWord (setBit h (i-bitSize l)) l
+>               | i >= finiteBitSize l = BigWord (setBit h (i-finiteBitSize l)) l
 >               | otherwise      = BigWord h (setBit l i)
 >       shiftL b i = fromIntegral
 >                  . (`shiftL` i)
@@ -486,9 +499,9 @@ Larger word aliases follow.
 >                  . fromIntegral $ b
 >       isSigned _ = False
 >       testBit (BigWord h l) i
->               | i >= bitSize l = testBit h (i - bitSize l)
+>               | i >= finiteBitSize l = testBit h (i - finiteBitSize l)
 >               | otherwise      = testBit l i
->       bitSize ~(BigWord h l) = bitSize h + bitSize l
+>       bitSize ~(BigWord h l) = finiteBitSize h + finiteBitSize l
 >
 > instance (Bounded a, Eq a, Num a, Enum a, Bounded b, Eq b, Num b, Enum b)
 >          => Enum (BigWord a b) where
@@ -530,12 +543,12 @@ Larger word aliases follow.
 >       compare (BigWord a b) (BigWord c d) = compare (a,b) (c,d)
 >
 > instance (Bits a, Real a, Bounded a, Integral a
->          , Bits b, Real b, Bounded b, Integral b)
+>          , Bits b, Real b, Bounded b, Integral b, FiniteBits a, FiniteBits b)
 >          => Real (BigWord a b) where
 >       toRational w = toRational (fromIntegral w :: Integer)
 >
-> instance (Bounded a, Integral a, Bits a
->          ,Bounded b, Integral b, Bits b) => Integral (BigWord a b) where
+> instance (Bounded a, Integral a, Bits a, FiniteBits a
+>          ,Bounded b, Integral b, Bits b, FiniteBits b) => Integral (BigWord a b) where
 >       {-# SPECIALIZE instance Integral Word256 #-}
 >       {-# SPECIALIZE instance Integral Word512 #-}
 >       {-# SPECIALIZE instance Integral Word576 #-}
@@ -544,11 +557,11 @@ Larger word aliases follow.
 >       {-# SPECIALIZE instance Integral Word2048 #-}
 >       {-# SPECIALIZE instance Integral Word4096 #-}
 >       {-# SPECIALIZE instance Integral Word8192 #-}
->       toInteger (BigWord h l) = (fromIntegral h `shiftL` bitSize l) + fromIntegral l
+>       toInteger (BigWord h l) = (fromIntegral h `shiftL` finiteBitSize l) + fromIntegral l
 >       divMod = quotRem
 >       quotRem a b =
 >               let r = a - q * b
->                   q = go 0 (bitSize a) 0
+>                   q = go 0 (finiteBitSize a) 0
 >               in (q, r)
 >        where
 >        -- go :: BigWord a b -> Int -> BigWord a b -> BigWord a b
@@ -562,12 +575,14 @@ Larger word aliases follow.
 >         v1 = (v `shiftL` 1) .|. newBit
 >         v2 = ((v-b) `shiftL` 1) .|. newBit
 >
-> instance (Bounded a, Bits a, Integral a, Bounded b, Bits b, Integral b)
+> instance ( Bounded a, Bits a, Integral a, FiniteBits a
+>          , Bounded b, Bits b, Integral b, FiniteBits b)
 >          => Show (BigWord a b) where
 >       show = show . fromIntegral
 >
 > instance (Integral a, Num a, Bits a, Ord a, Bounded a
->          ,Integral b, Num b, Bits b, Ord b, Bounded b)
+>          ,Integral b, Num b, Bits b, Ord b, Bounded b
+>          ,FiniteBits a, FiniteBits b)
 >          => Read (BigWord a b) where
 >       readsPrec i s = let readsPrecI :: Int -> ReadS Integer
 >                           readsPrecI = readsPrec
@@ -597,28 +612,31 @@ For fixed point, the flat representation needs to be signed.
 > -- need to provide alternate show, read, and comparison operations.
 > newtype BigInt a = BigInt { unBI :: a }
 >
-> instance (Ord a, Bits a) => Ord (BigInt a) where
+> instance (Ord a, Num a, FiniteBits a) => FiniteBits (BigInt a) where
+>       finiteBitSize (BigInt a) = finiteBitSize a
+>
+> instance (Ord a, Bits a, FiniteBits a) => Ord (BigInt a) where
 >       compare (BigInt a) (BigInt b)
->         | testBit a (bitSize a - 1) = if testBit b (bitSize b - 1)
+>         | testBit a (finiteBitSize a - 1) = if testBit b (finiteBitSize b - 1)
 >                                               then compare a b  -- a and b are negative
 >                                               else LT           -- a is neg, b is non-neg
->         | testBit b (bitSize b - 1) = GT -- a non-negative, b is negative
+>         | testBit b (finiteBitSize b - 1) = GT -- a non-negative, b is negative
 >         | otherwise = compare a b -- a and b are non-negative
 >
 > instance (Eq a) => Eq (BigInt a) where
 >       BigInt a == BigInt b = a == b
 >
-> instance (Show a, Num a, Bits a, Ord a) => Show (BigInt a) where
+> instance (FiniteBits a, Show a, Num a, Bits a, Ord a) => Show (BigInt a) where
 >       show i@(BigInt a)
 >         | i < 0 = '-' : show (complement a + 1)
 >         | otherwise = show a
 >
-> instance (Num a, Bits a, Ord a) => Read (BigInt a) where
+> instance (Num a, Bits a, Ord a, FiniteBits a) => Read (BigInt a) where
 >       readsPrec i s = let readsPrecI :: Int -> ReadS Integer
 >                           readsPrecI = readsPrec
 >                       in [(fromIntegral i, str) | (i,str) <- readsPrecI i s]
 >
-> instance (Num a, Bits a, Ord a) => Num (BigInt a) where
+> instance (FiniteBits a, Num a, Bits a, Ord a) => Num (BigInt a) where
 >       (BigInt a) + (BigInt b) = BigInt (a+b)
 >       (BigInt a) - (BigInt b) = BigInt (a-b)
 >       (BigInt a) * (BigInt b) = BigInt (a*b)
@@ -628,14 +646,15 @@ For fixed point, the flat representation needs to be signed.
 >       fromInteger i = if i < 0 then negate (BigInt $ fromInteger (abs i))
 >                                else BigInt (fromInteger i)
 >
-> instance (Bits a, Num a, Ord a) => Bits (BigInt a) where
+> instance (Bits a, Num a, Ord a, FiniteBits a) => Bits (BigInt a) where
+>       rotate (BigInt a) i = BigInt (rotate a i)
 >       popCount (BigInt a) = popCount a
 >       (.&.) a b = BigInt (unBI a .&. unBI b)
 >       (.|.) a b = BigInt (unBI a .|. unBI b)
 >       xor a b   = BigInt (unBI a `xor` unBI b)
 >       complement = BigInt . complement . unBI
 >       shiftL a i = BigInt . (`shiftL` i) . unBI $ a
->       shiftR a i = (if a < 0  then \x -> foldl setBit x [bitSize a-1, bitSize a - 2 .. bitSize a - i]
+>       shiftR a i = (if a < 0  then \x -> foldl setBit x [finiteBitSize a-1, finiteBitSize a - 2 .. finiteBitSize a - i]
 >                               else id)
 >                  . BigInt 
 >                  . (`shiftR` i) 
@@ -644,16 +663,16 @@ For fixed point, the flat representation needs to be signed.
 >       bit = BigInt . bit
 >       setBit a i = BigInt . (`setBit` i) . unBI $ a
 >       testBit a i = (`testBit` i) . unBI $ a
->       bitSize (BigInt a) = bitSize a
+>       bitSize (BigInt a) = finiteBitSize a
 >       isSigned _ = True
 >
-> instance (Bits a, Ord a, Integral a, Bounded a, Num a) => Enum (BigInt a) where
+> instance (Bits a, Ord a, Integral a, Bounded a, Num a, FiniteBits a) => Enum (BigInt a) where
 >       toEnum i = fromIntegral i
 >       fromEnum i = fromIntegral i
 >       pred a | a > minBound = (a - 1)
 >       succ a | a < maxBound = (a + 1)
 >
-> instance (Integral a, Bits a, Bounded a) => Integral (BigInt a) where
+> instance (Integral a, Bits a, Bounded a, FiniteBits a) => Integral (BigInt a) where
 >       toInteger i@(BigInt h) =
 >               (if (i < 0) then negate else id) . toInteger . (if i < 0 then negate else id) $ h
 >       quotRem a b =
@@ -668,13 +687,13 @@ For fixed point, the flat representation needs to be signed.
 >                                       then (negate $ BigInt q1, BigInt r1)
 >                                       else (BigInt q1, BigInt r1)
 >
-> instance (Real a, Bounded a, Integral a, Bits a) => Real (BigInt a) where
+> instance (FiniteBits a, Real a, Bounded a, Integral a, Bits a) => Real (BigInt a) where
 >       toRational = fromIntegral
 >
 >
-> instance (Bounded a, Ord a, Bits a, Num a) => Bounded (BigInt a) where
->       minBound = let r = fromIntegral (negate (2^ (bitSize r - 1))) in r
->       maxBound = let r = fromIntegral (2^(bitSize r - 1) - 1) in r
+> instance (Bounded a, Ord a, Bits a, Num a, FiniteBits a) => Bounded (BigInt a) where
+>       minBound = let r = fromIntegral (negate (2^ (finiteBitSize r - 1))) in r
+>       maxBound = let r = fromIntegral (2^(finiteBitSize r - 1) - 1) in r
 >
 > instance (Storable a) => Storable (BigInt a) where
 >       sizeOf ~(BigInt a) = sizeOf a
