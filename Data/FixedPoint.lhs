@@ -265,6 +265,7 @@ domain).
 >       (.&.) = flat2 (.&.)
 >       complement = fromFlat . complement . toFlat
 >       bitSize a = fracBits a * 2
+>       bitSizeMaybe a = Just (fracBits a * 2)
 >       isSigned _ = False
 >       shiftL = flat1 shiftL
 >       shiftR = flat1 shiftR
@@ -330,7 +331,10 @@ classes, would be a beneficial task.
 >       testBit (W128 h l) i
 >               | i >= finiteBitSize l = testBit h (i - finiteBitSize l)
 >               | otherwise      = testBit l i
+>       rotateL w i = shiftL w i .|. shiftR w (128 - i)
+>       rotateR w i = shiftR w i .|. shiftL w (128 - i)
 >       bitSize _ = 128
+>       bitSizeMaybe _ = Just 128
 >
 > instance Enum Word128 where
 >       toEnum i            = W128 0 (toEnum i)
@@ -497,6 +501,8 @@ Larger word aliases follow.
 >                  . (`shiftR` i)
 >                  . (id :: Integer -> Integer)
 >                  . fromIntegral $ b
+>       rotateL w i = shiftL w i .|. shiftR w (finiteBitsSize w - i)
+>       rotateR w i = shiftR w i .|. shiftL w (finiteBitsSize w - i)
 >       isSigned _ = False
 >       testBit (BigWord h l) i
 >               | i >= finiteBitSize l = testBit h (i - finiteBitSize l)
@@ -578,7 +584,7 @@ Larger word aliases follow.
 > instance ( Bounded a, Bits a, Integral a, FiniteBits a
 >          , Bounded b, Bits b, Integral b, FiniteBits b)
 >          => Show (BigWord a b) where
->       show = show . fromIntegral
+>       show = show . (id :: Integer -> Integer) . fromIntegral
 >
 > instance (Integral a, Num a, Bits a, Ord a, Bounded a
 >          ,Integral b, Num b, Bits b, Ord b, Bounded b
@@ -692,8 +698,8 @@ For fixed point, the flat representation needs to be signed.
 >
 >
 > instance (Bounded a, Ord a, Bits a, Num a, FiniteBits a) => Bounded (BigInt a) where
->       minBound = let r = fromIntegral (negate (2^ (finiteBitSize r - 1))) in r
->       maxBound = let r = fromIntegral (2^(finiteBitSize r - 1) - 1) in r
+>       minBound = let r = fromIntegral (negate (2^ (finiteBitSize r - 1)) :: Integer) in r
+>       maxBound = let r = fromIntegral (2^(finiteBitSize r - 1) - 1 :: Integer) in r
 >
 > instance (Storable a) => Storable (BigInt a) where
 >       sizeOf ~(BigInt a) = sizeOf a
