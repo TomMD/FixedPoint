@@ -501,13 +501,14 @@ Larger word aliases follow.
 >                  . (`shiftR` i)
 >                  . (id :: Integer -> Integer)
 >                  . fromIntegral $ b
->       rotateL w i = shiftL w i .|. shiftR w (finiteBitsSize w - i)
->       rotateR w i = shiftR w i .|. shiftL w (finiteBitsSize w - i)
+>       rotateL w i = shiftL w i .|. shiftR w (finiteBitSize w - i)
+>       rotateR w i = shiftR w i .|. shiftL w (finiteBitSize w - i)
 >       isSigned _ = False
 >       testBit (BigWord h l) i
 >               | i >= finiteBitSize l = testBit h (i - finiteBitSize l)
 >               | otherwise      = testBit l i
 >       bitSize ~(BigWord h l) = finiteBitSize h + finiteBitSize l
+>       bitSizeMaybe ~(BigWord h l) = Just $ finiteBitSize h + finiteBitSize l
 >
 > instance (Bounded a, Eq a, Num a, Enum a, Bounded b, Eq b, Num b, Enum b)
 >          => Enum (BigWord a b) where
@@ -670,6 +671,7 @@ For fixed point, the flat representation needs to be signed.
 >       setBit a i = BigInt . (`setBit` i) . unBI $ a
 >       testBit a i = (`testBit` i) . unBI $ a
 >       bitSize (BigInt a) = finiteBitSize a
+>       bitSizeMaybe (BigInt a) = Just (finiteBitSize a)
 >       isSigned _ = True
 >
 > instance (Bits a, Ord a, Integral a, Bounded a, Num a, FiniteBits a) => Enum (BigInt a) where
